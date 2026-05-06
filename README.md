@@ -1,117 +1,111 @@
-# BZip2 Compression Stage 1 - Burrows-Wheeler Transform & RLE
+# BZip2 Compression Algorithm - Full Implementation Pipeline
 
-This project implements the first phase of a BZip2-style compression pipeline. It includes file block management, Run-Length Encoding (RLE-1), and the Burrows-Wheeler Transform (BWT) to prepare data for higher efficiency compression.
+This project implements a complete, highly optimized version of the BZip2 compression algorithm. It features a multi-stage data compression pipeline including Run-Length Encoding (RLE), the Burrows-Wheeler Transform (BWT), Move-to-Front (MTF) transform, and Canonical Huffman Coding.
+
+This project also includes an **Extra Credit implementation of a Suffix Array** to process massive files (10MB+) efficiently without memory overflow, alongside an automated Python benchmarking suite for performance evaluation.
 
 ---
 
 ## 🚀 Features
 
-- **Block Management** Automatically divides large input files into manageable blocks based on a configurable size.
-
-- **RLE-1 Encoding/Decoding** A primary run-length encoding stage that collapses repeating byte sequences into `[char, count]` pairs.
-
-- **Burrows-Wheeler Transform (BWT)** Rearranges data into runs of similar characters to improve compression ratios using a rotation matrix approach.
-
-- **Configurable Settings** Uses an external `config.ini` file to toggle features and set block sizes.
-
-- **Trace System** Provides a detailed step-by-step debug view of the data as it moves through each transformation stage.
+- **Block Management:** Automatically divides massive input files into configurable memory-safe blocks (e.g., 500KB to 900KB).
+- **Run-Length Encoding (RLE-1 & RLE-2):**
+  - **RLE-1:** Collapses initial repeating byte sequences into `[char, count]` pairs.
+  - **RLE-2:** Specialized encoding targeting the high frequency of zeros produced by the MTF transform.
+- **Suffix Array-Based BWT (Extra Credit):** Replaces the standard $O(N^2)$ memory-heavy rotation matrix with a highly efficient $O(N)$ Suffix Array, allowing the algorithm to quickly process up to 10MB blocks without crashing.
+- **Move-to-Front (MTF):** Encodes data by maintaining a list of symbols and outputting the index of each symbol before moving it to the front of the list, producing highly localized data.
+- **Canonical Huffman Coding:** Generates an optimal binary tree based on character frequencies, storing only the bit-lengths in the file header so the decoder can mathematically perfectly reconstruct the tree.
+- **Automated Benchmarking Suite:** A Python script that automatically processes all test datasets, calculates real compression ratios, measures execution time and RAM usage, and plots output graphs.
 
 ---
 
 ## 📂 Project Structure
 
-| File        | Description |
-|------------|------------|
-| `main.cpp` | Orchestrates the compression trace and block management |
-| `bwt.cpp`  | Implements the Burrows-Wheeler Transform (Encode/Decode) |
-| `rle.cpp`  | Implements the Stage 1 Run-Length Encoding logic |
-| `config.cpp` | Handles parsing of the `config.ini` settings |
-| `bzip2.h`  | Global headers, data structures, and function prototypes |
-| `Makefile` | Build instructions for Linux and cross-compilation for Windows |
+This project follows a strict production-ready directory structure:
+
+| Directory / File | Description |
+| :--- | :--- |
+| `src/` | Contains all C++ source files (`main.cpp`, `rle.cpp`, `bwt.cpp`, `mtf.cpp`, `huffman.cpp`, `config.cpp`). |
+| `include/` | Contains global headers, structs, and function prototypes (`bzip2.h`). |
+| `benchmarks/` | Contains the input `.txt` datasets for compression testing. |
+| `results/` | Output directory where the automated `results.csv` and performance graphs are saved. |
+| `Makefile` | Cross-platform build instructions for compiling the project. |
+| `benchmark.py` | Python script for automated performance evaluation and graph generation. |
+| `config.ini` | External configuration file to toggle pipeline features. |
 
 ---
 
 ## 🛠️ Getting Started
 
 ### 📋 Prerequisites
-- GCC/G++ Compiler  
-- Make  
+- **C++ Compilation:** GCC/G++ Compiler and `make`.
+- **Benchmarking:** Python 3, `pandas`, and `matplotlib`.
+  - Install Python libraries: `pip install pandas matplotlib`
 
 ---
 
 ### ⚙️ Compilation & Execution
 
 #### 🐧 Linux
-Compile the project:
-`make`
-
-Run the executable:
-`./bzip2_impl`
+Compile the project from the root directory:
+```bash
+make
+```
+Run the executable manually (pass the file you want to compress):
+```bash
+./bzip2_impl benchmarks/test1.txt
+```
 
 #### 🪟 Windows (Cross-Compilation via MinGW)
-Compile the project:
-`make windows`
-
+Compile the project for Windows:
+```bash
+make windows
+```
 Run the executable:
-`bzip2_impl.exe`
+```cmd
+bzip2_impl.exe benchmarks\test1.txt
+```
 
 ---
 
-## ⚙️ Configuration
+## 📊 Automated Benchmarking
 
-Modify `config.ini` to adjust the compression parameters:
-
-- `block_size` → Maximum size of each data block in bytes  
-- `rle1_enabled` → Toggle the initial RLE pass  
-- `bwt_type` → Method used for BWT (default: `matrix`)  
+To test the algorithm's performance against multiple files and generate visual graphs:
+1. Place your text files (e.g., Natural Language, 10MB synthetic files) into the `benchmarks/` folder.
+2. Run the Python benchmarking script:
+```bash
+python3 benchmark.py
+```
+3. Check the `results/` folder for `results.csv`, `time_graph.png`, and `ratio_graph.png`. The script actively measures the true compression ratio, execution time (in seconds), and total RAM usage (in MB).
 
 ---
 
 ## 🔄 Transformation Workflow
 
-### 1. Original Input
-Data is read from `test.txt` and divided into blocks.
+Our compression engine passes data sequentially through 5 encoding stages, and reverses them perfectly during decoding:
 
-### 2. RLE-1 Encode
-Consecutive identical characters are compressed.  
-**Example:** `BBBB → [B, 4]`
+### Encoding Pipeline
+1. **Block Division:** Reads data into a 500KB memory buffer.
+2. **RLE-1:** Compresses highly redundant continuous data.
+3. **BWT:** Sorts data lexicographically using a Suffix Array to group similar characters.
+4. **MTF:** Translates grouped characters into small integer values (mostly zeros).
+5. **RLE-2:** Heavily compresses the zeros generated by MTF.
+6. **Canonical Huffman:** Assigns the smallest possible bit-codes to the most frequent numbers, packs them into bytes, and attaches a 256-byte header.
 
-### 3. BWT Encode
-- Data is lexicographically rotated  
-- Last column of the rotation matrix is stored  
-- `primary_index` is saved for reconstruction  
-
-### 4. BWT Decode
-Reverses the permutation using the next vector transformation.
-
-### 5. RLE-1 Decode
-Expands compressed data back to original form.
-
----
-
-## 🧪 Debug Output Example
-
-When running `bzip2_impl`, the system provides a hex-trace of the transformation:
-
-=== 1. ORIGINAL INPUT (Size: 18) ===
-Data [Char|Hex]: [A|41] [B|42] [B|42] ...
-
-=== 2. AFTER RLE-1 ENCODE (Size: 10) ===
-Data [Char|Hex]: [A|41] [.|01] [B|42] ...
-
-=== 3. AFTER BWT ENCODE (Size: 10) ===
-Primary Index: 2
-Data [Char|Hex]: [D|44] [D|44] [A|41] ...
-
-=========================================
-SUCCESS! Decoded data matches original block perfectly.
+### Decoding Pipeline
+1. **Huffman Decode:** Reads the 256-byte header, rebuilds the exact canonical tree, and decodes the bitstream.
+2. **RLE-2 Decode:** Expands the zero-runs.
+3. **MTF Decode:** Converts the integer indices back into characters.
+4. **BWT Decode:** Uses the LF-Mapping algorithm to instantly reverse the sort.
+5. **RLE-1 Decode:** Expands the original character runs back to the exact initial input.
 
 ---
 
 ## 👥 Project Team
 
-- **Ahmad Nadeem** (22I-1162) — [Add brief contribution here]  
-- **Iman Qamar** (22L-6854) — [Add brief contribution here]  
-- **Noor Ul Amin** (22L-6675) — [Add brief contribution here]  
+- **Ahmad Nadeem (22I-1162)** 
+- **Iman Qamar (22L-6854)** 
+- **Noor Ul Amin (22L-6675)** 
 
-**Course Instructor:** Dr. Faisal Aslam
+**Course Instructor:** Dr. Faisal Aslam  
+**Date:** 6 May 2026
