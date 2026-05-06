@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -Wall -O2 -I./include
 TARGET = bzip2_impl
-SOURCES = main.cpp rle.cpp bwt.cpp config.cpp 
+SOURCES = src/main.cpp src/rle.cpp src/bwt.cpp src/mtf.cpp src/huffman.cpp src/config.cpp 
 
 all:
 	$(CXX) $(CXXFLAGS) $(SOURCES) -o $(TARGET)

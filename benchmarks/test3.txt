@@ -1,0 +1,1 @@
+The Burrows-Wheeler Transform is a block-sorting compression algorithm that rearranges a character string into runs of similar characters. This is useful for compression, since it tends to be easy to compress a string that has runs of repeated characters. When combined with Move-to-Front and Huffman coding, it forms the basis of the highly efficient BZip2 algorithm.
