@@ -64,13 +64,31 @@ void free_block_manager(BlockManager *manager) {
 // MAIN PIPELINE
 // ============================================================================
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        std::cerr << "Usage: ./bzip2_impl <input_file> <output_file>\n";
+    // Check for 4 arguments: ./bzip2_impl <flag> <input> <output>
+    if (argc < 4) {
+        std::cerr << "Usage: ./bzip2_impl <mode_flag> <input_file> <output_file>\n";
+        std::cerr << "Modes:\n";
+        std::cerr << "  -c : Compress/Encode raw dataset\n";
+        std::cerr << "  -d : Decompress/Decode compressed archive\n";
         return 1;
     }
-    const char* input_file = argv[1];
-    const char* output_file = argv[2];
 
+    std::string mode_flag  = argv[1];
+    const char* input_file  = argv[2];
+    const char* output_file = argv[3];
+
+    // Evaluate Mode Switch Command
+    bool CONFIG_RUN_ENCODE = true;
+    if (mode_flag == "-c") {
+        CONFIG_RUN_ENCODE = true;
+    } else if (mode_flag == "-d") {
+        CONFIG_RUN_ENCODE = false;
+    } else {
+        std::cerr << "Error: Unrecognized operational flag '" << mode_flag << "'. Use -c or -d.\n";
+        return 1;
+    }
+
+    // Load feature-toggles remaining inside config settings
     std::unordered_map<std::string, std::string> config = load_config("config.ini");
     auto get_bool = [&](const std::string& key, bool default_val = true) {
         if (config.find(key) != config.end()) {
@@ -80,9 +98,7 @@ int main(int argc, char* argv[]) {
         return default_val; 
     };
 
-    bool CONFIG_RUN_ENCODE              = get_bool("encode_mode", true); 
     bool CONFIG_RUN_DECODE_VERIFICATION = get_bool("decode_verification", false);
-    
     bool CONFIG_USE_RLE1    = get_bool("rle1_enabled");
     bool CONFIG_USE_BWT     = get_bool("bwt_enabled");
     bool CONFIG_USE_MTF     = get_bool("mtf_enabled");
@@ -90,7 +106,7 @@ int main(int argc, char* argv[]) {
     bool CONFIG_USE_HUFFMAN = get_bool("huffman_enabled");
 
     std::cout << "\n======================================================\n";
-    std::cout << " BZIP2 DZIP ENGINE (METRICS & DECODER COMPLETE)\n";
+    std::cout << " BZIP2 DZIP ENGINE (CLI ATTRIBUTES ROUTING)\n";
     std::cout << "======================================================\n";
     std::cout << "Operation Mode: " << (CONFIG_RUN_ENCODE ? "[ENCODER]" : "[STANDALONE DECOMPRESSOR]") << "\n\n";
 
@@ -102,7 +118,7 @@ int main(int argc, char* argv[]) {
     auto pipeline_start_clock = std::chrono::high_resolution_clock::now();
 
     // ------------------------------------------------------------------------
-    // MODE 1: STANDALONE DECOMPRESSOR MODE
+    // MODE 1: STANDALONE DECOMPRESSOR MODE (-d)
     // ------------------------------------------------------------------------
     if (!CONFIG_RUN_ENCODE) {
         std::ifstream compressed_stream(input_file, std::ios::binary);
@@ -119,7 +135,6 @@ int main(int argc, char* argv[]) {
         size_t compressed_size = 0, original_block_size = 0, len_before_bwt = 0, pre_huffman_len = 0;
         int primary_index = 0;
 
-        // Read the full 5-part binary tracking header sequentially
         compressed_stream.read(reinterpret_cast<char*>(&compressed_size), sizeof(compressed_size));
         compressed_stream.read(reinterpret_cast<char*>(&original_block_size), sizeof(original_block_size));
         compressed_stream.read(reinterpret_cast<char*>(&len_before_bwt), sizeof(len_before_bwt));
@@ -146,7 +161,7 @@ int main(int argc, char* argv[]) {
             total_huff_dec_time += std::chrono::duration<double, std::milli>(t_end - t_start).count();
 
             dec_ptr = huff_dec.data(); 
-            dec_len = pre_huffman_len; // Drop bit padding junk values explicitly
+            dec_len = pre_huffman_len; 
             print_stage("5. HUFFMAN DECODED", dec_ptr, dec_len);
         }
 
@@ -234,7 +249,7 @@ int main(int argc, char* argv[]) {
     }
 
     // ------------------------------------------------------------------------
-    // MODE 2: ENCODER MODE
+    // MODE 2: ENCODER MODE (-c)
     // ------------------------------------------------------------------------
     BlockManager manager = divide_into_blocks(input_file, 500000);
     if (manager.num_blocks == 0) return 1;
@@ -342,7 +357,6 @@ int main(int argc, char* argv[]) {
 
         total_output_bytes += enc_len;
 
-        // Write complete structural 5-part tracking header layout to disk securely
         out_stream.write(reinterpret_cast<char*>(&enc_len), sizeof(enc_len));
         out_stream.write(reinterpret_cast<char*>(&original_block_size), sizeof(original_block_size));
         out_stream.write(reinterpret_cast<char*>(&len_before_bwt), sizeof(len_before_bwt));
@@ -363,7 +377,7 @@ int main(int argc, char* argv[]) {
                 size_t out_len = 0;
                 huffman_decode(dec_ptr, dec_len, huff_dec.data(), &out_len);
                 dec_ptr = huff_dec.data(); 
-                dec_len = pre_huffman_len; // FIX: Overwrite bounds with pre_huffman_len to drop noise bits!
+                dec_len = pre_huffman_len; 
                 auto t_end = std::chrono::high_resolution_clock::now();
                 total_huff_dec_time += std::chrono::duration<double, std::milli>(t_end - t_start).count();
                 print_stage("5. HUFFMAN DECODED", dec_ptr, dec_len);
